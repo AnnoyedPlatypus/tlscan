@@ -50,7 +50,7 @@ class Enumerator(object):
         for v in version_list:
             response = self.send_client_hello(v)
 
-            if (type(response) == "str"):
+            if (isinstance(response,list)):
                 if len(response) > 0:
                     s_hello = None
                     for record in response:
@@ -235,6 +235,7 @@ class Enumerator(object):
 
     def send_client_hello(self, version, ciphers_tls=ciphers_tls):
         response = None
+
         try:
             with TCP(self.target.host, self.target.port).connect() as tcp:
                 if self.clear_text_layer:

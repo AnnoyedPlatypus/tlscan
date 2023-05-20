@@ -22,12 +22,12 @@ class TCP(object):
             # return self.socket
             return self
         except socket.gaierror:
-            print("Invalid/unknown host ({0})".format(self.host))
+            print("[!] Invalid/unknown host ({0})".format(self.host))
         except (socket.timeout, ConnectionRefusedError):
-            print("Unable to connect to the remote host/service")
+            print("[!] Unable to connect to the remote host/service")
         except socket.error as e:
             if e.errno == errno.EHOSTDOWN or e.errno == errno.EHOSTUNREACH:
-                print("The host provided is down/unreachable")
+                print("[!] The host provided is down/unreachable")
             else:
                 raise e
         except:

@@ -42,8 +42,8 @@ def test(target, preamble, sni_name):
 
     for p in supported_protocols:
         enum.get_cipher_support(p)
-
-    if type(supported_protocols) == "list":
+  
+    if isinstance(supported_protocols,list) and len(supported_protocols) > 0:
         if p_versions[supported_protocols[0]] == p_versions['TLSv1_3'] and len(supported_protocols) > 1:
             enum.get_certificate(supported_protocols[1])
         else:
@@ -51,7 +51,7 @@ def test(target, preamble, sni_name):
 
 
 def main():
-    parser = ArgumentParser(description='Scanner to enumerate encryption protocol support', prog='TLScan3')
+    parser = ArgumentParser(description='Scanner to enumerate encryption protocol support', prog='tlscan3')
     parser.add_argument('target', type=str, help="specify target as: host:port e.g. www.example.com:443 or "
                                                  "[::1]:443 for IPv6")
     parser.add_argument('--version', action='version', version='%(prog)s 3.1')
