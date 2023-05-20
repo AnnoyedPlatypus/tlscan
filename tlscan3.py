@@ -43,10 +43,11 @@ def test(target, preamble, sni_name):
     for p in supported_protocols:
         enum.get_cipher_support(p)
 
-    if p_versions[supported_protocols[0]] == p_versions['TLSv1_3'] and len(supported_protocols) > 1:
-        enum.get_certificate(supported_protocols[1])
-    else:
-        enum.get_certificate(supported_protocols[0])
+    if type(supported_protocols) == "list":
+        if p_versions[supported_protocols[0]] == p_versions['TLSv1_3'] and len(supported_protocols) > 1:
+            enum.get_certificate(supported_protocols[1])
+        else:
+            enum.get_certificate(supported_protocols[0])
 
 
 def main():

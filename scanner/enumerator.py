@@ -50,25 +50,26 @@ class Enumerator(object):
         for v in version_list:
             response = self.send_client_hello(v)
 
-            if len(response) > 0:
-                s_hello = None
-                for record in response:
-                    if isinstance(record, ServerHello):
-                        s_hello = record
-                        break
-                if s_hello:
-                    if s_hello.handshake_protocol == versions[v]:
-                        supported.append(v)
-                        self.print_verbose("  [+] {0}".format(v))
-                        if s_hello.compression_method is not None:
-                            self.print_verbose("      Compression: {0}".format(s_hello.compression_method.name))
-                    if Protocol.is_tls1_3(versions[v]) and \
-                            s_hello.extensions_length > 0:  # Check if relevant extension is present
-                        for extension in s_hello.extensions():
-                            if extension.extension_type == ExtensionType.supported_versions:
-                                supported.append(v)
-                                self.print_verbose("  [+] {0}".format(v))
-
+            if (type(response) == "str"):
+                if len(response) > 0:
+                    s_hello = None
+                    for record in response:
+                        if isinstance(record, ServerHello):
+                            s_hello = record
+                            break
+                    if s_hello:
+                        if s_hello.handshake_protocol == versions[v]:
+                            supported.append(v)
+                            self.print_verbose("  [+] {0}".format(v))
+                            if s_hello.compression_method is not None:
+                                self.print_verbose("      Compression: {0}".format(s_hello.compression_method.name))
+                        if Protocol.is_tls1_3(versions[v]) and \
+                                s_hello.extensions_length > 0:  # Check if relevant extension is present
+                            for extension in s_hello.extensions():
+                                if extension.extension_type == ExtensionType.supported_versions:
+                                    supported.append(v)
+                                    self.print_verbose("  [+] {0}".format(v))
+            
         return supported
 
     def print_verbose(self, string):
@@ -234,21 +235,24 @@ class Enumerator(object):
 
     def send_client_hello(self, version, ciphers_tls=ciphers_tls):
         response = None
-        with TCP(self.target.host, self.target.port).connect() as tcp:
-            if self.clear_text_layer:
-                stls = StartTLS(self.clear_text_layer)
-                stls.prepare_socket(tcp)
-            tls = TLSConnection(tcp)  # Pass the socket object (connection) to start a TLSConnection instance
-            if Protocol.is_tls1_3(versions[version]):
-                # TLS1.3 should ignore ciphers not supported so we SHOULD be able to provide all TLS ciphers we know
-                client_hello = self.create_tls13_extended_client_hello(ciphers_tls)
-                response = tls.send_record(client_hello)
-            elif Protocol.is_ssl3_tls(versions[version]):
-                client_hello = self.create_ecc_extended_client_hello(versions[version], ciphers_tls)
-                client_hello.set_compression(bytearray(b'\x01\x00'))  # DEFLATE, null
-                response = tls.send_record(client_hello)
-            elif Protocol.is_ssl2(versions[version]):
-                response = tls.send_record(ClientHello(versions[version], ciphers_ssl2))
+        try:
+            with TCP(self.target.host, self.target.port).connect() as tcp:
+                if self.clear_text_layer:
+                    stls = StartTLS(self.clear_text_layer)
+                    stls.prepare_socket(tcp)
+                tls = TLSConnection(tcp)  # Pass the socket object (connection) to start a TLSConnection instance
+                if Protocol.is_tls1_3(versions[version]):
+                    # TLS1.3 should ignore ciphers not supported so we SHOULD be able to provide all TLS ciphers we know
+                    client_hello = self.create_tls13_extended_client_hello(ciphers_tls)
+                    response = tls.send_record(client_hello)
+                elif Protocol.is_ssl3_tls(versions[version]):
+                    client_hello = self.create_ecc_extended_client_hello(versions[version], ciphers_tls)
+                    client_hello.set_compression(bytearray(b'\x01\x00'))  # DEFLATE, null
+                    response = tls.send_record(client_hello)
+                elif Protocol.is_ssl2(versions[version]):
+                    response = tls.send_record(ClientHello(versions[version], ciphers_ssl2))
+        except:
+            pass
 
         return response
 
