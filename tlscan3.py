@@ -54,7 +54,7 @@ def test(target, preamble, sni_name):
             enum.get_certificate(supported_protocols[0])
 
 
-def lambda_handler():
+def lambda_handler(event, lambda_context):
 
     # parser = ArgumentParser(description='Scanner to enumerate encryption protocol support', prog='tlscan3')
     # parser.add_argument('target', type=str, help="specify target as: host:port e.g. www.example.com:443 or "
@@ -81,19 +81,20 @@ def lambda_handler():
     try:
         dynamo_db = os.environ['DYNAMO_TABLE']
         print(f"Dynamo table: {dynamo_db}")
-        # cloudwatch_log = os.environ['CLOUDWATCH_LOG']
-        # print(f"Cloudwatch log: {cloudwatch_log}")
         dynamodb = boto3.resource('dynamodb')
-        table = dynamodb.Table('tlscan')
+        table = dynamodb.Table(dynamo_db)
         response = table.scan()
-        # print(f"Found {str.count(response['Items'])} to scan.")
         for item in response['Items']:
             targetRecord = item
             print(f"Target record: {targetRecord}")
             targetConfig = json.loads(item['config'])
             print(f"Target config: {targetConfig}")
+            print(f"Target port: {targetConfig['port']}")
+            if targetConfig['port'] == "":
+                targetConfig['port'] = "443"
             if targetConfig['sni'] == "":
                 targetConfig['sni'] = None
+            targetRecord['hostname'] = targetRecord['hostname'] + ":" + targetConfig['port']
             # Do the below scanning tasks in here
             try:
                 try:
@@ -102,15 +103,16 @@ def lambda_handler():
                     print("[!] Failed to parse target, trying again by adding a default port (443)")
                     t = TargetParser(targetRecord['hostname'] + ":443").get_target()
                 test(t, preamble, targetConfig['sni'])
+                # write results and last test timestamp here
             except KeyboardInterrupt:
                 print("[!] Received termination signal, exiting!")
                 exit(3)
             except:
                 raise
     except:
-        print(f"[!] FATAL ERROR MISSING ENV VARIABLE")
+        print(f"[!] FATAL ERROR CONNECTING TO DYNAMODB OR PARSING HOST TARGET")
 
 
 if __name__ == '__main__':
     os.environ['DYNAMO_TABLE'] = "tlscan"
-    lambda_handler()
+    lambda_handler(False, False)
