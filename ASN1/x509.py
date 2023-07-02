@@ -4,16 +4,16 @@ from . import ObjectIdentifier as OID
 
 
 X509_MAP = {
-    OID.commonName.value: 'CN',           # commonName
-    OID.countryName.value: 'C',           # countryName
-    OID.localityName.value: 'L',          # localityName (City)
-    OID.stateOrProvinceName.value: 'ST',  # stateOrProvinceName (State)
-    OID.streetAddress.value: 'STREET',    # streetAddress
-    OID.organizationName.value: 'O',      # organizationName
-    OID.organizationalUnitName: 'OU',     # organizationalUnitName
-    OID.title.value: 'T',                 # title
-    # '2.5.4.15': 'BC',                   # businessCategory
-    OID.emailAddress: 'E',                # e-mailAddress
+    OID.commonName.value: 'CN',                 # commonName
+    OID.countryName.value: 'C',                 # countryName
+    OID.localityName.value: 'L',                # localityName (City)
+    OID.stateOrProvinceName.value: 'ST',        # stateOrProvinceName (State)
+    OID.streetAddress.value: 'STREET',          # streetAddress
+    OID.organizationName.value: 'O',            # organizationName
+    OID.organizationalUnitName: 'OU',           # organizationalUnitName
+    OID.title.value: 'T',                       # title
+    # '2.5.4.15': 'BC',                         # businessCategory
+    OID.emailAddress: 'E',                      # e-mailAddress
 
     # Public Key and Signature Algorithms (most widely used)
     '1.2.840.113549.1.1.1': 'rsaEncryption',
@@ -56,6 +56,7 @@ class Certificate:
 
     issuer = None
     subject = None
+    san = None
     validity = None
     public_key_info = None
     signature_algorithm = None

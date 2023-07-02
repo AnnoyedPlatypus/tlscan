@@ -1,9 +1,13 @@
 from sys import exit
-from argparse import ArgumentParser
+from argparse import ArgumentParser, Namespace
 from datetime import datetime
 
 from scanner import TargetParser, Enumerator, start_tls
 from TLS.protocols import versions as p_versions
+
+import os
+import boto3
+import json
 
 # ToDo
 # cipher preference
@@ -50,41 +54,63 @@ def test(target, preamble, sni_name):
             enum.get_certificate(supported_protocols[0])
 
 
-def main():
-    parser = ArgumentParser(description='Scanner to enumerate encryption protocol support', prog='tlscan3')
-    parser.add_argument('target', type=str, help="specify target as: host:port e.g. www.example.com:443 or "
-                                                 "[::1]:443 for IPv6")
-    parser.add_argument('--version', action='version', version='%(prog)s 3.1')
-    p_group = parser.add_mutually_exclusive_group()
-    for key, value in start_tls.items():
-        p_group.add_argument("--{}".format(key), dest=key, action='store_true',
-                             help='Use {} as protocol layer'.format(key.upper()))
-    parser.add_argument('--sni', type=str, dest='sni', help="SNI name to use in the handshake")
+def lambda_handler():
 
-    args = parser.parse_args()
+    # parser = ArgumentParser(description='Scanner to enumerate encryption protocol support', prog='tlscan3')
+    # parser.add_argument('target', type=str, help="specify target as: host:port e.g. www.example.com:443 or "
+    #                                              "[::1]:443 for IPv6")
+    # parser.add_argument('--version', action='version', version='%(prog)s 3.1')
+    # p_group = parser.add_mutually_exclusive_group()
+    # for key, value in start_tls.items():
+    #     p_group.add_argument("--{}".format(key), dest=key, action='store_true',
+    #                          help='Use {} as protocol layer'.format(key.upper()))
+    # parser.add_argument('--sni', type=str, dest='sni', help="SNI name to use in the handshake")
+
+    # args = parser.parse_args()
+
+    # for key, value in start_tls.items():
+    #     try:
+    #         if getattr(args, key):
+    #             preamble = key
+    #             break
+    #     except AttributeError:
+    #         pass
+
     preamble = None
 
-    for key, value in start_tls.items():
-        try:
-            if getattr(args, key):
-                preamble = key
-                break
-        except AttributeError:
-            pass
-
     try:
-        try:
-            t = TargetParser(args.target).get_target()
-        except ValueError:
-            print("[!] Failed to parse target, trying again by adding a default port (443)")
-            t = TargetParser(args.target + ":443").get_target()
-        test(t, preamble, args.sni)
-    except KeyboardInterrupt:
-        print("[!] Received termination signal, exiting!")
-        exit(3)
+        dynamo_db = os.environ['DYNAMO_TABLE']
+        print(f"Dynamo table: {dynamo_db}")
+        # cloudwatch_log = os.environ['CLOUDWATCH_LOG']
+        # print(f"Cloudwatch log: {cloudwatch_log}")
+        dynamodb = boto3.resource('dynamodb')
+        table = dynamodb.Table('tlscan')
+        response = table.scan()
+        # print(f"Found {str.count(response['Items'])} to scan.")
+        for item in response['Items']:
+            targetRecord = item
+            print(f"Target record: {targetRecord}")
+            targetConfig = json.loads(item['config'])
+            print(f"Target config: {targetConfig}")
+            if targetConfig['sni'] == "":
+                targetConfig['sni'] = None
+            # Do the below scanning tasks in here
+            try:
+                try:
+                    t = TargetParser(targetRecord['hostname']).get_target()
+                except ValueError:
+                    print("[!] Failed to parse target, trying again by adding a default port (443)")
+                    t = TargetParser(targetRecord['hostname'] + ":443").get_target()
+                test(t, preamble, targetConfig['sni'])
+            except KeyboardInterrupt:
+                print("[!] Received termination signal, exiting!")
+                exit(3)
+            except:
+                raise
     except:
-        raise
+        print(f"[!] FATAL ERROR MISSING ENV VARIABLE")
 
 
 if __name__ == '__main__':
-    main()
+    os.environ['DYNAMO_TABLE'] = "tlscan"
+    lambda_handler()
