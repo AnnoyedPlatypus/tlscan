@@ -9,6 +9,9 @@ import os
 import boto3
 import json
 
+from https_check import *
+from parse import *
+
 # ToDo
 # cipher preference
 # encrypted sni (https://tools.ietf.org/html/draft-ietf-tls-esni-02)
@@ -80,38 +83,64 @@ def lambda_handler(event, lambda_context):
 
     try:
         dynamo_db = os.environ['DYNAMO_TABLE']
-        print(f"Dynamo table: {dynamo_db}")
+        # print(f"Dynamo table: {dynamo_db}")
         dynamodb = boto3.resource('dynamodb')
         table = dynamodb.Table(dynamo_db)
         response = table.scan()
+        print("====================================")
         for item in response['Items']:
             targetRecord = item
-            print(f"Target record: {targetRecord}")
+            
             targetConfig = json.loads(item['config'])
-            print(f"Target config: {targetConfig}")
-            print(f"Target port: {targetConfig['port']}")
-            if targetConfig['port'] == "":
-                targetConfig['port'] = "443"
-            if targetConfig['sni'] == "":
-                targetConfig['sni'] = None
-            targetRecord['hostname'] = targetRecord['hostname'] + ":" + targetConfig['port']
-            # Do the below scanning tasks in here
-            try:
-                try:
-                    t = TargetParser(targetRecord['hostname']).get_target()
-                except ValueError:
-                    print("[!] Failed to parse target, trying again by adding a default port (443)")
-                    t = TargetParser(targetRecord['hostname'] + ":443").get_target()
-                test(t, preamble, targetConfig['sni'])
-                # write results and last test timestamp here
-            except KeyboardInterrupt:
-                print("[!] Received termination signal, exiting!")
-                exit(3)
-            except:
-                raise
-    except:
-        print(f"[!] FATAL ERROR CONNECTING TO DYNAMODB OR PARSING HOST TARGET")
 
+            # Check if the item is enabled to scan
+            if targetRecord['enabled'] == True:
+                # print(f"Target record: {targetRecord}")
+                # print(f"Target config: {targetConfig}")
+                # print(f"Target port: {targetConfig['port']}")
+
+                if targetConfig['port'] == "":
+                    targetConfig['port'] = "443"
+                if targetConfig['sni'] == "":
+                    targetConfig['sni'] = None
+                if targetConfig['protocol'] == "":
+                    targetConfig['protocol'] = "https"
+                if targetConfig['path'] == "":
+                    targetConfig['path'] = ""
+                targetRecord['hostnamePort'] = targetRecord['hostname'] + ":" + targetConfig['port']
+                
+                if targetRecord['check_cert'] == True:
+                    # Do the TLS scanning tasks here
+                    try:
+                        try:
+                            t = TargetParser(targetRecord['hostnamePort']).get_target()
+                            print(f"{ t }")
+                        except ValueError:
+                            print("[!] Failed to parse target, trying again by adding a default port (443)")
+                            t = TargetParser(targetRecord['hostnamePort'] + ":443").get_target()
+                        test(t, preamble, targetConfig['sni'])
+                        # write results and last test timestamp here
+                    except KeyboardInterrupt:
+                        print(f"[!] Received termination signal, exiting!")
+                        exit(3)
+                    except:
+                        print(f"[!] FATAL ERROR CERT CHECK HOST TARGET { targetRecord['hostnamePort'] }")
+
+                if targetRecord['check_http'] == True:
+                    # Port check here
+                    try:
+                        print(f"Attempting HTTP status check on { targetConfig['protocol']}://{targetRecord['hostname'] }:{ targetConfig['port'] }/{targetConfig['path']}")
+                        t = doRequest(targetConfig['protocol'], targetRecord['hostname'], str(targetConfig['port']), targetConfig['path'])
+                        print(f"{ t }")
+                        parseResults(t, targetConfig, targetRecord['notify'])
+                    except ValueError:
+                        print(f"[!] FAILED TO PORT CHECK TARGET")
+            else:
+                print(f"[*] HOST TARGET { targetRecord['hostname'] } IS DISABLED")
+            
+            print("====================================")
+    except:
+        print(f"[!] FATAL ERROR CONNECTING TO DYNAMODB OR PARSING HOST TARGET { targetRecord['hostname'] }")
 
 if __name__ == '__main__':
     os.environ['DYNAMO_TABLE'] = "tlscan"
